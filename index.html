@@ -740,8 +740,8 @@ GAMES.push({ cmd:'とめろ！', grip:'mash',
   const z1 = document.createElement('div'); z1.className='zone'; z1.style.left='13%'; z1.style.top='50%'; z1.innerHTML = shelf(76);
   const z2 = document.createElement('div'); z2.className='zone'; z2.style.left='87%'; z2.style.top='50%'; z2.innerHTML = bin(76);
   stage.append(z1, z2);
-  el(tidier(78, true), 72, 22).style.cursor = 'default';
-  if(ctx.tier >= 3) el(tidier(78, true), 80, 70).style.cursor = 'default';
+  el(tidier(104, true), 73, 23).style.cursor = 'default';
+  if(ctx.tier >= 3) el(tidier(104, true), 81, 71).style.cursor = 'default';
   const s = el(slipper('#D9534F',54,false), 50, 50);
   s.style.cursor = 'default';
   const g = document.createElement('div'); g.className = 'gauge'; g.innerHTML = '<i></i>';
@@ -979,7 +979,7 @@ GAMES.push({ cmd:'ひっぱれ！', grip:'rub',
   how:'大きな矢印の向きに画面をこすってスリッパを引き寄せろ。逆向きに払うと負け。',
   sub: t => t>=3 ? 'むきが変わる' : t>=2 ? '回数がおおい' : '矢印の向きへ',
   build(ctx){
-  el(tidier(64, true), 80, 24).style.cursor = 'default';
+  el(tidier(96, true), 79, 25).style.cursor = 'default';
   const s = el(slipper(RED, 58, false), 62, 52);
   s.style.cursor = 'default';
   const need = ctx.tier >= 3 ? 4 : ctx.tier >= 2 ? 3 : 2;
@@ -1256,7 +1256,7 @@ function gameOver(){
   const rank = S.score >= 30 ? '玄関大明神' : S.score >= 20 ? '守護長老'
              : S.score >= 12 ? '中堅信徒' : S.score >= 6 ? '見習い' : '一般人';
   const v = veil(`
-    <div style="display:flex;align-items:flex-end;gap:16px;line-height:0">${guardian(64)}${bin(54)}</div>
+    <div style="display:flex;align-items:flex-end;gap:16px;line-height:0">${guardian(92)}${bin(58)}</div>
     <h1 style="font-size:24px">スリッパは<br>捨てられた</h1>
     <div class="big-num">${S.score}</div>
     ${isBest ? '<div class="combo" style="position:static">自己ベスト更新！</div>' : ''}
