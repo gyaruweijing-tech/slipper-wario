@@ -58,10 +58,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  /* 動画は途中から取りにくる（Range要求）ことがある。
+     その応答は中身が切れているのに res.ok が true になるので、
+     キャッシュに入れると次から壊れた動画を返してしまう。ここは素通しする */
+  if (req.headers.has('range')) return;
+
   /* それ以外：キャッシュ優先 */
   event.respondWith(
     caches.match(req).then(hit => hit || fetch(req).then(res => {
-      if (res.ok) {
+      if (res.status === 200) {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy));
       }

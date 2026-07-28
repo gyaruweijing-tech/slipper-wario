@@ -8,7 +8,10 @@
 | `char-guardian.png` | 主人公・守護者 | **背景透過**PNG。全身・正面。長辺600px程度 |
 | `char-tidier.png` | かたづけ魔 | 同上 |
 | `logo.png` | タイトルロゴ | **背景透過**PNG。横長。「スリッパを捨てるな」 |
-| `opening.mp4` | オープニング動画 | H.264 / yuv420p / **音声なし** / 720×1280 / 8秒 / 1.5MB以下 |
+| `opening.mp4` | オープニング動画 | H.264 / yuv420p / **音声なし** / 1280×720（横長）/ 8秒 / 1.5MB以下 |
+
+動画は**横長のまま**、墨色の余白と金の細線で縁取って映画のように再生します。
+縦にトリミングしません。再生中はHUDも消えます。
 
 ## 背景は必ず透過にすること
 
@@ -31,7 +34,7 @@ Gemini などの出力をそのまま `opening-raw.mp4` として置いてコミ
 
 ```bash
 ffmpeg -i opening-raw.mp4 -an \
-  -vf "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=30" \
+  -vf "scale=1280:720:force_original_aspect_ratio=decrease,fps=30" \
   -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 26 -preset slow \
   -movflags +faststart opening.mp4
 ```

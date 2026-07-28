@@ -150,6 +150,13 @@ button.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #2F614A}
 .howlist b{display:block;font-size:15px;color:var(--green)}
 .sublink{background:none;border:none;font:inherit;font-size:13px;color:var(--sub);
   text-decoration:underline;cursor:pointer;padding:4px}
+/* ---- オープニング。横長の映像を墨色で縁取って映画のように見せる ---- */
+.veil.film{background:#15140F;padding:0;gap:0;justify-content:center;z-index:20}
+.veil.film video{width:100%;height:auto;max-height:100%;display:block;
+  border-top:2px solid rgba(201,162,39,.55);border-bottom:2px solid rgba(201,162,39,.55)}
+.veil.film .skip{position:absolute;bottom:20px;left:0;right:0;text-align:center;
+  font-size:11px;letter-spacing:3px;color:rgba(251,247,239,.5);pointer-events:none}
+#app.cinema #hud,#app.cinema #bar{display:none}
 /* 差し替え用のキャラ画像。SVGと同じ扱いになるようにしておく */
 img.art{display:block;width:auto;pointer-events:none;-webkit-user-drag:none}
 img.art.logo{width:82%;max-width:310px;height:auto}
@@ -1048,9 +1055,57 @@ function title(){
     ${bestLine}
     <button class="btn" id="go">はじめる</button>
     <button class="sublink" id="howto">あそびかたを見る</button>
+    <button class="sublink" id="op">オープニングを見る</button>
     <p class="creed">— 教義 —<br>一、よかれと思ってはならぬ<br>二、スリッパは家族である<br>三、片方だけでも家族である</p>`);
-  v.querySelector('#go').onclick = () => { actx(); SFX.start(); bgmStart(); nextRound(); };
+  const start = () => { bgmStart(); nextRound(); };
+  v.querySelector('#go').onclick = () => {
+    actx(); SFX.start();
+    /* 初回だけ、押した直後にオープニングを流してからラウンド1へ */
+    openingSeen() ? start() : (v.remove(), playOpening(start));
+  };
   v.querySelector('#howto').onclick = () => howto();
+  v.querySelector('#op').onclick = () => { v.remove(); playOpening(title); };
+}
+
+/* --- オープニング ---
+   方針：これで詰まることが絶対にないようにする。
+   ファイルが無い／再生できない／途中で失敗した、どの場合も黙って次へ進む。
+   自動再生ではなく「はじめる」を押した直後に流すので、必ずユーザー操作が
+   起点になり、スマホの自動再生ブロックに引っかからない。 */
+const OPENING = 'assets/opening.mp4';
+
+function playOpening(next){
+  let done = false;
+  const end = () => {
+    if(done) return;
+    done = true;
+    clearTimeout(guard);
+    try{ vid.pause(); vid.removeAttribute('src'); vid.load(); }catch(e){}
+    app.classList.remove('cinema');
+    wrap.remove();
+    try{ localStorage.setItem('slipperOpening', '1'); }catch(e){}
+    next();
+  };
+  const wrap = document.createElement('div');
+  wrap.className = 'veil film';
+  wrap.style.opacity = '0';        /* 再生が始まるまで黒幕を見せない */
+  wrap.innerHTML = `<video playsinline webkit-playsinline muted preload="auto"></video>
+    <div class="skip">タップでとばす</div>`;
+  stage.appendChild(wrap);
+  const vid = wrap.querySelector('video');
+  /* 何かの理由で再生も失敗通知も来ないときの保険 */
+  const guard = setTimeout(end, 20000);
+  vid.onplaying = () => { wrap.style.opacity = '1'; app.classList.add('cinema'); };
+  vid.onended   = end;
+  vid.onerror   = end;
+  wrap.onpointerdown = end;
+  vid.src = OPENING;
+  const pr = vid.play();
+  if(pr && pr.catch) pr.catch(end);
+}
+/* 初回だけ流す。2回目以降はタイトルの「オープニングを見る」から */
+function openingSeen(){
+  try{ return localStorage.getItem('slipperOpening') === '1'; }catch(e){ return true; }
 }
 
 /* --- あそびかた一覧 --- */
