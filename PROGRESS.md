@@ -48,6 +48,11 @@ LVは**4ラウンドごと**に上がる。制限時間は 4.3秒 ÷ 速度（�
 - ハイスコアを localStorage（`slipperBest`）に保存
 - **タブを離れると時間が止まる**（visibilitychange で deadline を補正。戻った瞬間に即死しないため）
 
+## 公開状況
+- GitHub: `gyaruweijing-tech/slipper-wario`（**private**）。コミットは noreply アドレス
+- 検索避けのみ実施（`vercel.json` の X-Robots-Tag / `robots.txt` / meta robots）
+- Basic認証は入れていない。Vercelに出す場合、本番URLはリンクを知っていれば誰でも開ける状態になる
+
 ## 動かし方
 `index.html` をブラウザで開くだけ。ローカルサーバーで見る場合:
 
