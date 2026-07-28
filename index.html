@@ -72,11 +72,12 @@ body{
   flex:0 0 auto; padding:10px 12px; display:flex; align-items:center; gap:8px;
   border-bottom:1px solid var(--line); background:var(--paper); z-index:5;
 }
-#lives{font-size:18px;letter-spacing:2px}
-#lives .off{opacity:.18}
+#lives{display:flex;align-items:center;gap:5px}
+#lives span{display:block;line-height:0}
+#lives .off{opacity:.16}
 #score{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px}
 #score small{color:var(--sub);font-weight:400;margin-right:4px;font-size:11px}
-#mute{border:none;background:none;font-size:17px;cursor:pointer;padding:2px 4px;opacity:.85}
+#mute{border:none;background:none;cursor:pointer;padding:2px 4px;opacity:.85;line-height:0}
 #bar{height:6px;background:var(--line);position:relative;flex:0 0 auto}
 #bar>i{position:absolute;inset:0 auto 0 0;background:var(--green);width:100%}
 #bar.hot>i{background:var(--red)}
@@ -149,6 +150,36 @@ button.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #2F614A}
 .howlist b{display:block;font-size:15px;color:var(--green)}
 .sublink{background:none;border:none;font:inherit;font-size:13px;color:var(--sub);
   text-decoration:underline;cursor:pointer;padding:4px}
+/* ---- かまえカード（Wiiの「フォーム」にあたる、操作の宣言） ---- */
+.grip{display:flex;flex-direction:column;align-items:center;gap:10px;
+  animation:pop .22s cubic-bezier(.2,1.7,.4,1)}
+.grip .gname{font-size:34px;font-weight:900;letter-spacing:6px}
+.grip .ghint{font-size:13px;color:var(--sub);letter-spacing:1px}
+.grip .gtag{font-size:11px;font-weight:800;letter-spacing:3px;color:var(--gold)}
+.twohand{position:absolute;top:28px;left:0;right:0;text-align:center;
+  font-size:11px;font-weight:800;letter-spacing:2px;color:var(--gold);pointer-events:none}
+.cmd .gripline{display:block;font-size:12px;font-weight:800;letter-spacing:3px;
+  color:var(--gold);margin-bottom:6px}
+.caption i{font-style:normal;color:var(--gold);font-weight:800;margin-right:5px}
+/* ---- 新しい入力用のパーツ ---- */
+.arrow{position:absolute;transform:translate(-50%,-50%);font-size:22px;font-weight:900;
+  color:var(--gold);pointer-events:none;line-height:1}
+.shelfbg{position:absolute;left:8%;right:8%;top:12%;height:28%;
+  background:var(--bg);border:3px solid var(--ink);border-radius:6px;pointer-events:none}
+.shelfbg::after{content:'';position:absolute;left:-3px;right:-3px;bottom:-3px;height:3px;background:var(--ink)}
+.slot{position:absolute;transform:translate(-50%,-50%);width:66px;height:82px;
+  border:3px dashed var(--line);border-radius:12px;background:rgba(255,255,255,.55);
+  pointer-events:none}
+.slot.hit{border-color:var(--green);border-style:solid;background:rgba(63,125,94,.12)}
+.obj.held{filter:brightness(.9)}
+.obj.grab{z-index:8}
+.bigarrow{position:absolute;left:0;right:0;top:44%;transform:translateY(-50%);
+  text-align:center;font-size:76px;font-weight:900;color:var(--gold);
+  pointer-events:none;line-height:1;animation:pop .2s}
+.pips{position:absolute;left:0;right:0;bottom:12%;text-align:center;
+  pointer-events:none;display:flex;gap:8px;justify-content:center}
+.pips b{width:13px;height:13px;border-radius:99px;border:2px solid var(--ink);display:block}
+.pips b.on{background:var(--gold);border-color:var(--gold)}
 </style>
 </head>
 <body>
@@ -156,13 +187,13 @@ button.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #2F614A}
   <div id="hud">
     <div id="lives"></div>
     <div id="score"><small>まもった</small><span>0</span></div>
-    <button id="mute" title="音のオンオフ">🔊</button>
+    <button id="mute" title="音のオンオフ" aria-label="音のオンオフ"></button>
   </div>
   <div id="bar"><i></i></div>
   <div id="stage"></div>
   <div id="flash"></div>
   <div id="rotate">
-    <div style="font-size:44px">🩴</div>
+    <div id="rotico" style="line-height:0"></div>
     <h1 style="font-size:20px">画面を縦にしてね</h1>
     <p class="lead">スリッパは縦に置くものです。</p>
   </div>
@@ -253,10 +284,9 @@ function bgmTick(){
   AU.bgmTimer = setTimeout(bgmTick, iv);
 }
 try{ AU.on = localStorage.getItem('slipperMute') !== '1'; }catch(e){}
-muteBtn.textContent = AU.on ? '🔊' : '🔇';
 muteBtn.onclick = () => {
   AU.on = !AU.on;
-  muteBtn.textContent = AU.on ? '🔊' : '🔇';
+  muteBtn.innerHTML = soundIcon(AU.on);
   try{ localStorage.setItem('slipperMute', AU.on ? '0' : '1'); }catch(e){}
   if(AU.on) SFX.tap();
 };
@@ -301,6 +331,145 @@ function slipper(color, size, flip, pat){
     <path d="M8 34C18 16 42 16 52 34c-10 12-34 12-44 0z" fill="#FFFDF8" stroke="#2B2A26" stroke-width="3"/>
   </svg>`;
 }
+
+/* --- ここから下は全部このルールで描く（スタイル憲法） ---
+   ・線は INK 一色 / 太さ3 固定
+   ・グラデーション・ドロップシャドウ禁止
+   ・1つにつき塗りは2色まで（本体色＋べた影）
+   ・顔は点目と線の口だけ。白目・ハイライトなし
+   ・影は落ち影を使わず、面の下側を同系の暗色でベタ塗り        */
+const INK='#2B2A26', RED='#D9534F', GREEN='#3F7D5E', GOLD='#C9A227',
+      CREAM='#FBF7EF', PAPER='#FFFDF8', BLUE='#4A6FA5', BROWN='#8A5A33';
+
+function art(w, h, size, inner, flip){
+  return `<svg width="${size}" height="${(size*h/w).toFixed(1)}" viewBox="0 0 ${w} ${h}"
+    fill="none" stroke="${INK}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"
+    style="display:block${flip ? ';transform:scaleX(-1)' : ''}">${inner}</svg>`;
+}
+/* 面の下側を暗色でベタ塗りする（版画っぽい影） */
+function shade(path, color, from){
+  const id = 'sh' + (++uid);
+  return `<defs><clipPath id="${id}"><path d="${path}"/></clipPath></defs>
+    <g clip-path="url(#${id})"><path d="M-5 ${from} H70 V99 H-5 Z" fill="${color}" stroke="none"/></g>`;
+}
+
+/* 横から見たスリッパ。真上から見た絵は小さくすると目玉に見えてしまうので、
+   HUDのライフなど小さく出す場所ではこちらを使う */
+const SIDE = 'M5 29H53C52 16 46 9 36 9C23 9 14 17 14 29Z';
+function slipperSide(color, size, flip){
+  return art(60, 34, size, `<path d="${SIDE}" fill="${color}"/><path d="${SIDE}"/>`, flip);
+}
+/* そろえて置かれた2足。1足だと目玉に見えるので、大きく見せる場所はこれ */
+function slipperPair(color, size){
+  return `<div style="display:flex;gap:${Math.round(size*.14)}px;line-height:0">
+    ${slipper(color, size, false)}${slipper(color, size, true)}</div>`;
+}
+
+/* ゴミ袋。hard=true は縄で縛った硬いやつ（2回叩く） */
+const BAG_SOFT = 'M30 17C47 17 55 30 55 43C55 53 44 58 30 58C16 58 5 53 5 43C5 30 13 17 30 17Z';
+const BAG_HARD = 'M30 17L50 25L55 44L44 58L16 58L5 44L10 25Z';
+function bag(size, hard){
+  const p  = hard ? BAG_HARD : BAG_SOFT;
+  const c  = hard ? '#A6403C' : RED;
+  const sd = hard ? '#772B29' : '#A6403C';
+  return art(60, 62, size, `
+    <path d="M30 19L17 4L27 18Z" fill="${c}"/><path d="M30 19L43 4L33 18Z" fill="${c}"/>
+    <path d="${p}" fill="${c}"/>
+    ${shade(p, sd, 44)}
+    ${hard ? `<path d="M7 33H53M9 44H51"/>` : ''}
+    <path d="${p}"/>`);
+}
+/* ゴミ箱。lid クラスの g をずらすとフタが開く */
+const BIN_BODY = 'M13 21L47 21L43 57L17 57Z';
+function bin(size){
+  return art(60, 62, size, `
+    <path d="${BIN_BODY}" fill="${GREEN}"/>
+    ${shade(BIN_BODY, '#2C5A43', 42)}
+    <path d="${BIN_BODY}"/>
+    <path d="M24 28L22 50M36 28L38 50"/>
+    <g class="lid"><path d="M7 13H53V21H7Z" fill="${CREAM}"/><path d="M25 5H35V13H25Z" fill="${CREAM}"/></g>`);
+}
+/* 下駄箱。玄関ではなく集合住宅の共用廊下にあるやつ */
+function shelf(size){
+  return art(60, 62, size, `
+    <path d="M6 12H54V57H6Z" fill="${CREAM}"/>
+    ${shade('M6 12H54V57H6Z', '#E8DFCC', 42)}
+    <path d="M6 12H54V57H6Z"/>
+    <path d="M6 27H54M6 42H54M30 12V57"/>
+    <path d="M19 20H24M42 20H47M19 35H24M42 35H47M19 50H24M42 50H47" stroke-width="4"/>`);
+}
+/* 埃・ゴミの塊（はらえ！用） */
+function dust(size){
+  const p = 'M30 12L41 18L52 22L46 33L49 45L36 47L28 55L20 45L8 42L13 30L9 18L22 19Z';
+  return art(60, 62, size, `<path d="${p}" fill="#9A9285"/>${shade(p, '#6F675C', 38)}<path d="${p}"/>`);
+}
+/* 主人公。フードをかぶった小さな守護者（差し替え前のプレースホルダ） */
+function guardian(size, flip){
+  return art(60, 74, size, `
+    <path d="M30 8C43 8 49 21 49 34V44H11V34C11 21 17 8 30 8Z" fill="${GREEN}"/>
+    ${shade('M30 8C43 8 49 21 49 34V44H11V34C11 21 17 8 30 8Z', '#2C5A43', 36)}
+    <path d="M30 8C43 8 49 21 49 34V44H11V34C11 21 17 8 30 8Z"/>
+    <path d="M21 30C21 24 25 21 30 21C35 21 39 24 39 30V34C39 39 35 43 30 43C25 43 21 39 21 34Z" fill="${CREAM}"/>
+    <circle cx="26" cy="31" r="2.3" fill="${INK}" stroke="none"/>
+    <circle cx="34" cy="31" r="2.3" fill="${INK}" stroke="none"/>
+    <path d="M27 38H33"/>
+    <path d="M15 44H45L51 70H9Z" fill="${GREEN}"/>
+    ${shade('M15 44H45L51 70H9Z', '#2C5A43', 58)}
+    <path d="M15 44H45L51 70H9Z"/>`, flip);
+}
+/* かたづけ魔。悪人ではなく、良かれと思ってやっている人。だからずっと笑っている */
+function tidier(size, flip){
+  return art(60, 74, size, `
+    <path d="M19 28C19 20 24 15 30 15C36 15 41 20 41 28V33C41 40 36 44 30 44C24 44 19 40 19 33Z" fill="${CREAM}"/>
+    ${shade('M19 28C19 20 24 15 30 15C36 15 41 20 41 28V33C41 40 36 44 30 44C24 44 19 40 19 33Z', '#E8DFCC', 37)}
+    <path d="M19 28C19 20 24 15 30 15C36 15 41 20 41 28V33C41 40 36 44 30 44C24 44 19 40 19 33Z"/>
+    <path d="M22 14C26 9 34 9 38 14"/>
+    <circle cx="25" cy="28" r="2.3" fill="${INK}" stroke="none"/>
+    <circle cx="35" cy="28" r="2.3" fill="${INK}" stroke="none"/>
+    <path d="M25 35C27 39 33 39 35 35"/>
+    <path d="M18 44H42L47 70H13Z" fill="${GOLD}"/>
+    ${shade('M18 44H42L47 70H13Z', '#96781C', 58)}
+    <path d="M18 44H42L47 70H13Z"/>
+    <path d="M43 50L54 45"/>`, flip);
+}
+/* さがせ！の妨害用。スリッパと紛らわしくない7種のシルエット */
+const FOOTWEAR = {
+  kutsu:   `<path d="M5 47C5 41 9 39 15 38L28 30C34 26 40 28 42 34L45 41C47 45 51 46 55 47V52H5Z" fill="${BROWN}"/><path d="M24 36L30 41"/>`,
+  sneaker: `<path d="M5 47C5 41 9 39 15 38L27 29C33 25 39 28 41 34L44 41C46 45 51 46 55 47V52H5Z" fill="${PAPER}"/><path d="M5 47H55M22 35L27 40M29 31L34 36"/>`,
+  boots:   `<path d="M20 8H38V38L48 40C53 41 55 45 55 50V53H18C13 53 10 50 10 45V42C10 40 14 39 20 38Z" fill="#6B4A2E"/><path d="M20 20H38"/>`,
+  rain:    `<path d="M22 8H40V36L50 39C54 41 56 45 56 50V53H20C15 53 12 50 12 45V41C12 39 16 38 22 36Z" fill="${GREEN}"/><path d="M22 17H40"/>`,
+  heel:    `<path d="M6 47C6 42 10 40 16 39L36 18C40 14 46 16 47 22L49 45V53H44L42 46L6 53Z" fill="${RED}"/>`,
+  sandal:  `<path d="M20 15C29 15 34 22 34 32C34 43 28 53 20 53C12 53 7 43 7 32C7 22 11 15 20 15Z" fill="${GOLD}"/><path d="M12 26L28 40M28 26L12 40"/>`,
+  sock:    `<path d="M22 8H38V33L50 41C55 44 56 50 53 53C50 56 45 55 42 52L26 42C22 39 22 36 22 32Z" fill="${BLUE}"/><path d="M22 17H38"/>`
+};
+const FOOT_KINDS = Object.keys(FOOTWEAR);
+function footwear(kind, size, flip){ return art(60, 60, size, FOOTWEAR[kind], flip); }
+/* HUDの音アイコン */
+function soundIcon(on){
+  return art(60, 60, 19, `<path d="M11 23H21L33 11V49L21 37H11Z" fill="${INK}"/>` + (on
+    ? `<path d="M40 22C44 27 44 33 40 38M47 15C54 24 54 36 47 45"/>`
+    : `<path d="M41 24L53 36M53 24L41 36"/>`));
+}
+/* かまえアイコン。指先＝金の丸、そこに動きの記号を足す */
+const GRIP_MARK = {
+  tap:  `<path d="M30 13V5M17 18L11 12M43 18L49 12"/>`,
+  mash: `<path d="M14 34A16 16 0 0 1 46 34"/><path d="M6 34A24 24 0 0 1 54 34" opacity=".45"/>`,
+  rub:  `<path d="M7 17C18 9 42 9 53 17"/><path d="M46 10L54 17L45 22"/>`,
+  hold: `<path d="M30 6V19M24 13L30 19L36 13"/><path d="M13 51H47"/>`,
+  drag: `<path d="M11 45C20 45 26 30 34 26" stroke-dasharray="4 6"/><path d="M40 17H54V31H40Z"/>`
+};
+function gripIcon(k, size){
+  return art(60, 60, size, `<circle cx="30" cy="34" r="9" fill="${GOLD}"/>` + (GRIP_MARK[k] || ''));
+}
+/* かまえの定義。これがWiiの「フォーム」にあたる */
+const GRIPS = {
+  tap:  { name:'たたく',   hint:'ねらって トンとたたく' },
+  mash: { name:'れんだ',   hint:'とにかく はやく何度も' },
+  rub:  { name:'こする',   hint:'指をすべらせて はらう' },
+  hold: { name:'おさえる', hint:'指をはなさず 押さえつづける' },
+  drag: { name:'はこぶ',   hint:'つまんだまま 運ぶ' }
+};
+
 function el(html, x, y, cls){
   const d = document.createElement('div');
   d.className = 'obj ' + (cls || '');
@@ -315,12 +484,87 @@ const pick = a => a[Math.floor(Math.random()*a.length)];
 function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
 
 /* =======================================================
+   3b. 入力ヘルパ（たたく以外の操作）
+   ステージは毎ラウンド innerHTML で消えるが、stage自身に付けた
+   リスナーは残ってしまうので、必ずここで登録して clearStage で外す
+   ======================================================= */
+let listeners = [];
+function on(t, type, fn){ t.addEventListener(type, fn); listeners.push([t, type, fn]); }
+function dropListeners(){ listeners.forEach(([t,ty,f]) => t.removeEventListener(ty,f)); listeners = []; }
+
+/* ステージ内の位置を % で返す。x と y でスケールが違うので dist は補正する */
+function stagePct(e){
+  const r = stage.getBoundingClientRect();
+  return { x:(e.clientX - r.left)/r.width*100, y:(e.clientY - r.top)/r.height*100 };
+}
+const YK = 0.62;   /* 1%(縦) は 1%(横) のおよそ 0.62 個分 */
+function near(p, x, y, r){ return Math.hypot(p.x - x, (p.y - y)*YK) <= r; }
+
+/* こする：押している間の移動ベクトルを流し続ける。dir 指定があれば向きも見る */
+function onRub(cb){
+  stage.style.touchAction = 'none';
+  let px = 0, py = 0, active = false;
+  on(stage, 'pointerdown', e => {
+    active = true; px = e.clientX; py = e.clientY;
+    try{ stage.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  on(stage, 'pointermove', e => {
+    if(!active) return;
+    const dx = e.clientX - px, dy = e.clientY - py, L = Math.hypot(dx, dy);
+    if(L < 10) return;
+    px = e.clientX; py = e.clientY;
+    cb(stagePct(e), dx/L, dy/L, L);
+  });
+  const end = () => { active = false; };
+  on(stage, 'pointerup', end); on(stage, 'pointercancel', end);
+}
+/* おさえる：その要素を押さえている間だけ true */
+function onHold(d){
+  stage.style.touchAction = 'none';
+  d.held = false;
+  on(d, 'pointerdown', e => {
+    e.stopPropagation(); d.held = true; d.classList.add('held');
+    try{ d.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  const up = () => { d.held = false; d.classList.remove('held'); };
+  on(d, 'pointerup', up); on(d, 'pointercancel', up); on(d, 'lostpointercapture', up);
+}
+/* はこぶ：つまんで動かして離す。離した位置を % で返す */
+function onDrag(d, onMove, onDrop){
+  stage.style.touchAction = 'none';
+  let grabbing = false;
+  on(d, 'pointerdown', e => {
+    e.stopPropagation(); grabbing = true; d.classList.add('grab');
+    try{ d.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  on(d, 'pointermove', e => {
+    if(!grabbing) return;
+    const p = stagePct(e);
+    d.px = p.x; d.py = p.y; move(d, p.x, p.y);
+    onMove && onMove(p);
+  });
+  const up = () => {
+    if(!grabbing) return;
+    grabbing = false; d.classList.remove('grab');
+    onDrop && onDrop(d.px, d.py);
+  };
+  on(d, 'pointerup', up); on(d, 'pointercancel', up); on(d, 'lostpointercapture', up);
+}
+/* 進み具合の丸ぽち（何回やればいいか見えるように） */
+function pips(n){
+  const w = document.createElement('div'); w.className = 'pips';
+  w.innerHTML = '<b></b>'.repeat(n);
+  stage.appendChild(w);
+  return k => w.querySelectorAll('b').forEach((b,i) => b.classList.toggle('on', i < k));
+}
+
+/* =======================================================
    4. ミニゲーム（build(ctx) / ctx.tier は 1〜3）
    ======================================================= */
 const GAMES = [];
 
 /* 1. まもれ！ — 迫るゴミ袋をたたく。tier1から蛇行 / tier2以降は硬い袋 */
-GAMES.push({ cmd:'まもれ！',
+GAMES.push({ cmd:'まもれ！', grip:'tap',
   how:'スリッパに迫るゴミ袋をタップして壊せ。1つでも届いたら負け。',
   sub: t => t>=3 ? 'かたいのだらけ' : t>=2 ? 'かたいのが混ざる' : 'ゴミ袋をたたけ',
   build(ctx){
@@ -334,13 +578,12 @@ GAMES.push({ cmd:'まもれ！',
     const o = { x: 50 + Math.cos(a)*72, y: 55 + Math.sin(a)*72 };
     let hp = ctx.tier >= 3 ? (i % 3 !== 0 ? 2 : 1)
            : ctx.tier >= 2 ? (i % 2 === 0 ? 2 : 1) : 1;
-    const d = el(hp > 1 ? '🪨' : '🗑️', o.x, o.y, 'big');
-    if(hp > 1) d.style.fontSize = '46px';
+    const d = el(bag(hp > 1 ? 52 : 44, hp > 1), o.x, o.y);
     const sp = (24 + ctx.tier*4) * ctx.rate;
     let t = rnd(0,6);
     d.onpointerdown = e => {
       e.stopPropagation();
-      if(--hp > 0){ d.textContent = '🗑️'; d.style.fontSize = '40px'; SFX.tap(); shake('tap'); return; }
+      if(--hp > 0){ d.innerHTML = bag(44, false); SFX.tap(); shake('tap'); return; }
       poof(d); if(--left === 0) ctx.win();
     };
     ctx.frame(dt => {
@@ -358,7 +601,7 @@ GAMES.push({ cmd:'まもれ！',
 }});
 
 /* 2. ひろえ！ — 落ちるスリッパを全部キャッチ。tier2からゴミが混ざる */
-GAMES.push({ cmd:'ひろえ！',
+GAMES.push({ cmd:'ひろえ！', grip:'tap',
   how:'落ちてくるスリッパを全部タップして拾え。1つでも床に落ちたら負け。ゴミ箱は触るな。',
   sub: t => t>=2 ? 'ゴミは掴むな' : '床につけるな',
   build(ctx){
@@ -382,7 +625,7 @@ GAMES.push({ cmd:'ひろえ！',
   if(ctx.tier >= 2){
     for(let i=0;i<(ctx.tier >= 3 ? 3 : 1);i++){
       const o = { x: rnd(15,85), y: rnd(-45,-10) };
-      const d = el('🗑️', o.x, o.y, 'big');
+      const d = el(bin(46), o.x, o.y);
       d.onpointerdown = e => { e.stopPropagation(); d.classList.add('shake'); ctx.lose(); };
       ctx.frame(dt => { if(d.dead) return; o.y += 30*ctx.rate*dt; move(d,o.x,o.y); });
     }
@@ -390,11 +633,10 @@ GAMES.push({ cmd:'ひろえ！',
 }});
 
 /* 3. さがせ！ — 履物の山からスリッパ。最初から動く */
-GAMES.push({ cmd:'さがせ！',
+GAMES.push({ cmd:'さがせ！', grip:'tap',
   how:'ゴチャゴチャの履物の中からスリッパを1つ見つけてタップ。他を押したら負け。',
   sub: t => t>=3 ? '速い、多い' : t>=2 ? 'よく動く' : 'スリッパはどれだ',
   build(ctx){
-  const junk = ['👞','🥾','🧦','👟','👡','🥿','👢'];
   const n = 12 + ctx.level*2 + (ctx.tier>=3 ? 6 : 0);
   const target = Math.floor(Math.random()*n);
   const drift = ctx.tier >= 3 ? 20 : ctx.tier >= 2 ? 13 : 6;
@@ -404,7 +646,7 @@ GAMES.push({ cmd:'さがせ！',
     const hit = i === target;
     const d = hit
       ? el(slipper(pick(SLIPPER_COLORS),46,Math.random()<.5), o.x, o.y)
-      : el(pick(junk), o.x, o.y, 'big');
+      : el(footwear(pick(FOOT_KINDS), 44, Math.random()<.5), o.x, o.y);
     d.style.transform = `translate(-50%,-50%) rotate(${rot}deg)`;
     d.onpointerdown = e => {
       e.stopPropagation();
@@ -420,7 +662,7 @@ GAMES.push({ cmd:'さがせ！',
 }});
 
 /* 4. そろえろ！ — 見本の片割れ。tier2 で同色の柄ちがい、tier3 は色×柄 6択 */
-GAMES.push({ cmd:'そろえろ！',
+GAMES.push({ cmd:'そろえろ！', grip:'tap',
   how:'上の見本とまったく同じスリッパを下から選べ。色だけでなく柄も見ろ。',
   sub: t => t>=3 ? '色も柄も見ろ' : t>=2 ? '柄を見ろ' : '左右をそろえろ',
   build(ctx){
@@ -455,16 +697,16 @@ GAMES.push({ cmd:'そろえろ！',
   stage.appendChild(t);
 }});
 
-/* 5. とめろ！ — 母がゴミ箱へ。連打で引き戻す。tier2から急加速、tier3は母が2人 */
-GAMES.push({ cmd:'とめろ！',
-  how:'画面をどこでも連打してスリッパを🏠まで引き戻せ。🗑️に着いたら負け。',
-  sub: t => t>=3 ? '母が2人いる' : t>=2 ? '力が強い' : '連打でひきもどせ',
+/* 5. とめろ！ — かたづけ魔がゴミ箱へ運ぶ。連打で引き戻す。tier3は2人がかり */
+GAMES.push({ cmd:'とめろ！', grip:'mash',
+  how:'画面をどこでも連打して、スリッパを下駄箱まで引き戻せ。ゴミ箱に着いたら負け。',
+  sub: t => t>=3 ? '2人がかりだ' : t>=2 ? '力が強い' : '連打でひきもどせ',
   build(ctx){
-  const z1 = document.createElement('div'); z1.className='zone'; z1.style.left='10%'; z1.style.top='50%'; z1.textContent='🏠';
-  const z2 = document.createElement('div'); z2.className='zone'; z2.style.left='90%'; z2.style.top='50%'; z2.textContent='🗑️';
+  const z1 = document.createElement('div'); z1.className='zone'; z1.style.left='13%'; z1.style.top='50%'; z1.innerHTML = shelf(76);
+  const z2 = document.createElement('div'); z2.className='zone'; z2.style.left='87%'; z2.style.top='50%'; z2.innerHTML = bin(76);
   stage.append(z1, z2);
-  el('👵', 76, 30, 'big').style.cursor = 'default';
-  if(ctx.tier >= 3) el('👵', 84, 68, 'big').style.cursor = 'default';
+  el(tidier(78, true), 74, 24).style.cursor = 'default';
+  if(ctx.tier >= 3) el(tidier(78, true), 82, 76).style.cursor = 'default';
   const s = el(slipper('#D9534F',54,false), 50, 50);
   s.style.cursor = 'default';
   const g = document.createElement('div'); g.className = 'gauge'; g.innerHTML = '<i></i>';
@@ -490,7 +732,7 @@ GAMES.push({ cmd:'とめろ！',
 }});
 
 /* 6. となえろ！ — 教義を順に。tier2 は逆から / tier3 は逆＋タイルが動く */
-GAMES.push({ cmd:'となえろ！',
+GAMES.push({ cmd:'となえろ！', grip:'tap',
   how:'バラバラの文字を「ス→リ→ッ→パ→を」の順にタップ。1つでも順番を間違えたら負け。',
   sub: t => t>=3 ? 'ぎゃく＋動く' : t>=2 ? 'ぎゃくから！' : 'ス→リ→ッ→パ→を',
   build(ctx){
@@ -524,14 +766,14 @@ GAMES.push({ cmd:'となえろ！',
   });
 }});
 
-/* 7. えらべ！ — 教義にしたがえ。tier2 で位置が入れ替わる / tier3 は4択＋2回入れ替え */
-GAMES.push({ cmd:'えらべ！',
-  how:'教義にしたがって選べ。スリッパは、捨てない。（位置が入れ替わることがある）',
+/* 7. えらべ！ — 教義にしたがえ。「かたづける」が罠。善意でも手を出したら負け */
+GAMES.push({ cmd:'えらべ！', grip:'tap',
+  how:'教義にしたがって選べ。よその履物は、そのままにする。片づけるのも罪である。',
   sub: t => t>=3 ? '2回入れ替わる' : t>=2 ? '入れ替わるぞ' : '教義にしたがえ',
   build(ctx){
   const labels = ctx.tier >= 3
-    ? ['すてる','すてない','ちょっとすてる','あとで すてる']
-    : ['すてる','すてない','ちょっとすてる'];
+    ? ['すてる','そのままにする','かたづける','よかれと思う']
+    : ['すてる','そのままにする','かたづける'];
   const ys = labels.length === 4 ? [22,42,62,82] : [28,50,72];
   const shown = shuffle(labels);
   const nodes = shown.map((txt,i) => {
@@ -539,7 +781,7 @@ GAMES.push({ cmd:'えらべ！',
     d.className = 'choice';
     d.textContent = txt;
     d.style.left = '50%'; d.style.top = ys[i] + '%';
-    d.dataset.ok = (txt === 'すてない') ? '1' : '';
+    d.dataset.ok = (txt === 'そのままにする') ? '1' : '';
     d.onpointerdown = e => {
       e.stopPropagation();
       if(d.dataset.ok === '1') ctx.win();
@@ -553,6 +795,181 @@ GAMES.push({ cmd:'えらべ！',
     ctx.after(520, swap);
     if(ctx.tier >= 3) ctx.after(1180, swap);
   }
+}});
+
+/* 8. はらえ！【こする】— 積もった埃をこすって落とす。tier3 は矢印の向きどおりに */
+GAMES.push({ cmd:'はらえ！', grip:'rub',
+  how:'スリッパに積もった埃を、指でこすって払い落とせ。全部落とせば勝ち。',
+  sub: t => t>=3 ? '矢印の向きへ' : t>=2 ? '数がおおい' : 'こすって落とせ',
+  build(ctx){
+  /* 埃はスリッパの上に積もっていてほしいので、大きく描いた靴の上に円状に配置する。
+     向き指定がある tier3 は、隣の埃を巻き込んで理不尽に負けないよう間隔を広くとる */
+  el(slipper(GREEN, 158, false), 50, 56).style.cursor = 'default';
+  const n  = ctx.tier >= 2 ? 4 : 3;
+  const rx = ctx.tier >= 3 ? 21 : 15, ry = ctx.tier >= 3 ? 14 : 11;
+  const DIRS = [[1,0,'→'],[-1,0,'←'],[0,-1,'↑'],[0,1,'↓']];
+  const bits = [];
+  for(let i=0;i<n;i++){
+    const a = -Math.PI/2 + i * (Math.PI*2/n);
+    const x = 50 + Math.cos(a)*rx, y = 56 + Math.sin(a)*ry;
+    const d = el(dust(rnd(30,36)), x, y);
+    d.style.cursor = 'default';
+    d.hx = x; d.hy = y;
+    if(ctx.tier >= 3){
+      /* 注意：DOM要素の .dir は文字方向の標準プロパティなので使えない */
+      d.sweep = pick(DIRS);
+      const a = document.createElement('div');
+      a.className = 'arrow'; a.textContent = d.sweep[2];
+      a.style.left = (x + d.sweep[0]*4.5) + '%';
+      a.style.top  = (y + d.sweep[1]*4 - 4.5) + '%';
+      stage.appendChild(a); d.arrow = a;
+    }
+    bits.push(d);
+  }
+  let left = n;
+  const setPips = pips(n);
+  onRub((p, ux, uy) => {
+    /* 判定するのは指に一番近い1個だけ。
+       全部を見ると、隣の埃（別の向き指定）まで巻き込んで理不尽に負ける */
+    let best = null, bestD = Infinity;
+    bits.forEach(d => {
+      if(d.dead) return;
+      const L = Math.hypot(p.x - d.hx, (p.y - d.hy)*YK);
+      if(L < bestD){ bestD = L; best = d; }
+    });
+    if(!best || bestD > 8.5) return;
+    if(best.sweep && (ux*best.sweep[0] + uy*best.sweep[1]) < .55){
+      best.classList.add('shake'); ctx.lose(); return;
+    }
+    if(best.arrow) best.arrow.remove();
+    poof(best); setPips(n - (--left));
+    if(left === 0) ctx.win();
+  });
+}});
+
+/* 9. おさえろ！【おさえる】— フタを押さえつづける。tier2 からは2つ同時＝両手 */
+GAMES.push({ cmd:'おさえろ！', grip:'hold', two: t => t >= 2,
+  how:'ゴミ箱のフタを指で押さえつづけろ。指を離すと開く。ゲージが満ちれば勝ち。',
+  sub: t => t>=3 ? 'ふたが逃げる' : t>=2 ? 'ふたが2つ' : 'ゆびをはなすな',
+  build(ctx){
+  const n = ctx.tier >= 2 ? 2 : 1;
+  const lids = [];
+  for(let i=0;i<n;i++){
+    const x = n === 1 ? 50 : (i === 0 ? 28 : 72);
+    const y = n === 1 ? 46 : (i === 0 ? 34 : 60);
+    const d = el(bin(84), x, y);
+    d.hx = x; d.hy = y;
+    d.lid = d.querySelector('.lid');
+    onHold(d);
+    if(ctx.tier >= 3){
+      const o = { vx: rnd(-1,1)*16, vy: rnd(-1,1)*12 };
+      ctx.frame(dt => {
+        d.hx += o.vx*dt; d.hy += o.vy*dt;
+        if(d.hx < 16 || d.hx > 84) o.vx *= -1;
+        if(d.hy < 22 || d.hy > 74) o.vy *= -1;
+        move(d, d.hx, d.hy);
+      });
+    }
+    lids.push(d);
+  }
+  const g = document.createElement('div'); g.className = 'gauge'; g.innerHTML = '<i></i>';
+  stage.appendChild(g);
+  const gi = g.querySelector('i');
+  gi.style.width = '0%';
+  let p = 0, done = false;
+  const need = Math.max(900, duration * .55);   /* 押さえ続ける必要のある時間 */
+  ctx.frame(dt => {
+    if(done) return;
+    const all = lids.every(l => l.held);
+    p = Math.max(0, Math.min(1, p + (all ? 1 : -.7) * dt * 1000 / need));
+    gi.style.width = (p*100) + '%';
+    lids.forEach(l => { if(l.lid) l.lid.setAttribute('transform', `translate(0,${l.held ? 0 : -7})`); });
+    if(p >= 1){ done = true; ctx.win(); }
+  });
+}});
+
+/* 10. しまえ！【はこぶ】— 下駄箱の枠までドラッグ。tier3 は枠が逃げる */
+GAMES.push({ cmd:'しまえ！', grip:'drag',
+  how:'スリッパをつまんで、点線の枠まで運んで離せ。全部おさめれば勝ち。',
+  sub: t => t>=3 ? 'わくが逃げる' : t>=2 ? '2そくぶん' : 'わくまで運べ',
+  build(ctx){
+  const n = ctx.tier >= 2 ? 2 : 1;
+  let left = n;
+  const bgShelf = document.createElement('div');
+  bgShelf.className = 'shelfbg';
+  stage.appendChild(bgShelf);
+  const cap = document.createElement('div');
+  cap.className = 'hint top'; cap.style.top = '44%'; cap.textContent = '↑ 下駄箱にしまえ';
+  stage.appendChild(cap);
+  const setPips = pips(n);
+  for(let i=0;i<n;i++){
+    const sx = n === 1 ? 50 : (i === 0 ? 26 : 74), sy = 76;
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    const s = { x: n === 1 ? 50 : (i === 0 ? 28 : 72), y: 26 };
+    slot.style.left = s.x + '%'; slot.style.top = s.y + '%';
+    stage.appendChild(slot);
+    const d = el(slipper(SLIPPER_COLORS[i % SLIPPER_COLORS.length], 54, i % 2 === 1), sx, sy);
+    d.px = sx; d.py = sy;
+    if(ctx.tier >= 3){
+      const o = { vx: rnd(-1,1)*17 };
+      ctx.frame(dt => {
+        s.x += o.vx*dt;
+        if(s.x < 18 || s.x > 82) o.vx *= -1;
+        slot.style.left = s.x + '%';
+      });
+    }
+    onDrag(d,
+      p => slot.classList.toggle('hit', !d.done && near(p, s.x, s.y, 13)),
+      (x, y) => {
+        if(d.done) return;
+        if(near({x,y}, s.x, s.y, 13)){
+          d.done = true;
+          move(d, s.x, s.y);
+          d.style.pointerEvents = 'none';
+          slot.classList.add('hit');
+          SFX.pop(); hitstop(45); buzz(12);
+          setPips(n - (--left));
+          if(left === 0) ctx.win();
+        }else{
+          slot.classList.remove('hit');
+          d.classList.add('shake'); ctx.lose();
+        }
+      });
+  }
+}});
+
+/* 11. ひっぱれ！【こする】— 矢印の向きへ払って引き寄せる。tier3 は向きが変わる */
+GAMES.push({ cmd:'ひっぱれ！', grip:'rub',
+  how:'大きな矢印の向きに画面をこすってスリッパを引き寄せろ。逆向きに払うと負け。',
+  sub: t => t>=3 ? 'むきが変わる' : t>=2 ? '回数がおおい' : '矢印の向きへ',
+  build(ctx){
+  el(tidier(64, true), 80, 24).style.cursor = 'default';
+  const s = el(slipper(RED, 58, false), 62, 52);
+  s.style.cursor = 'default';
+  const need = ctx.tier >= 3 ? 4 : ctx.tier >= 2 ? 3 : 2;
+  const DIRS = [[-1,0,'←'],[1,0,'→'],[0,-1,'↑'],[0,1,'↓']];
+  let dir = DIRS[0], hit = 0, done = false;
+  const big = document.createElement('div');
+  big.className = 'bigarrow'; big.textContent = dir[2];
+  stage.appendChild(big);
+  const setPips = pips(need);
+  const reroll = () => {
+    dir = pick(DIRS);
+    big.textContent = dir[2];
+    big.style.animation = 'none'; void big.offsetWidth; big.style.animation = '';
+  };
+  onRub((p, ux, uy) => {
+    if(done) return;
+    const d = ux*dir[0] + uy*dir[1];
+    if(d < -.5){ done = true; s.classList.add('shake'); ctx.lose(); return; }
+    if(d < .55) return;
+    hit++; setPips(hit);
+    SFX.tap(); hitstop(40); shake('tap'); buzz(10);
+    move(s, 62 - (62-38)*(hit/need), 52);
+    if(hit >= need){ done = true; return ctx.win(); }
+    if(ctx.tier >= 3) reroll();
+  });
 }});
 
 /* =======================================================
@@ -569,13 +986,16 @@ function clearStage(){
   timeouts.forEach(clearTimeout); timeouts = [];
   if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
   stage.onpointerdown = null;
+  dropListeners();                       /* こする/おさえる/はこぶ のリスナーを残さない */
+  stage.style.touchAction = '';
   stage.innerHTML = '';
   freezeUntil = 0;
 }
 function after(ms, fn){ timeouts.push(setTimeout(fn, ms)); }
 
 function drawHud(){
-  livesEl.innerHTML = [0,1,2].map(i => `<span class="${i < S.lives ? '' : 'off'}">🩴</span>`).join('');
+  livesEl.innerHTML = [0,1,2].map(i =>
+    `<span class="${i < S.lives ? '' : 'off'}">${slipperSide(GREEN, 22)}</span>`).join('');
   scoreEl.textContent = S.score;
 }
 function veil(html, cls){
@@ -593,29 +1013,41 @@ function title(){
   drawHud(); barIn.style.width = '100%'; barEl.classList.remove('hot');
   const bestLine = S.best ? `<p class="lead" style="margin-top:-6px">最高記録 <strong style="color:var(--gold)">${S.best}</strong></p>` : '';
   const v = veil(`
-    <div style="font-size:56px">🩴</div>
+    ${slipperPair(GREEN, 42)}
     <h1>スリッパを<br><em>捨てるな</em></h1>
-    <p class="lead">あなたは玄関を守る守護者である。<br>迫りくる廃棄の意志を、5秒でしりぞけよ。</p>
+    <p class="lead">あなたは、よかれと思って<br>よその一足を捨ててしまった。<br>その日から、守る側になった。</p>
     ${bestLine}
     <button class="btn" id="go">はじめる</button>
     <button class="sublink" id="howto">あそびかたを見る</button>
-    <p class="creed">— 教義 —<br>一、スリッパは家族である<br>二、片方だけでも家族である<br>三、洗えばまだいける</p>`);
+    <p class="creed">— 教義 —<br>一、よかれと思ってはならぬ<br>二、スリッパは家族である<br>三、片方だけでも家族である</p>`);
   v.querySelector('#go').onclick = () => { actx(); SFX.start(); bgmStart(); nextRound(); };
   v.querySelector('#howto').onclick = () => howto();
 }
 
 /* --- あそびかた一覧 --- */
 function howto(){
-  const items = GAMES.map(g => `<li><b>${g.cmd}</b>${g.how}</li>`).join('');
+  const grips = Object.keys(GRIPS).map(k =>
+    `<li style="display:flex;gap:10px;align-items:center">${gripIcon(k,34)}
+      <span><b style="display:inline;color:var(--gold)">${GRIPS[k].name}</b> ${GRIPS[k].hint}</span></li>`).join('');
+  const items = GAMES.map(g =>
+    `<li><b>${g.cmd}<span style="color:var(--gold);font-size:12px;margin-left:8px">${GRIPS[g.grip].name}</span></b>${g.how}</li>`).join('');
   const v = veil(`
     <h1 style="font-size:22px">あそびかた</h1>
-    <p class="lead" style="margin-top:-6px">全部タップだけ。制限時間は約4秒。<br>ライフ🩴3つ、4ラウンドごとに速くなる。</p>
-    <ul class="howlist">${items}</ul>
+    <p class="lead" style="margin-top:-6px">制限時間は約4秒。ライフ3つ。<br>4ラウンドごとに速くなる。</p>
+    <ul class="howlist">
+      <li><b>まず「かまえ」が出る</b>お題の前に、どう操作するかが出ます。
+        操作が前と変わるときだけ出るので、出たら持ちかたを変える合図です。</li>
+      ${grips}
+      <li style="border-top:1px solid var(--line);padding-top:12px"><b>お題</b></li>
+      ${items}
+    </ul>
     <button class="btn" id="back">もどる</button>`);
   v.querySelector('#back').onclick = () => { v.remove(); };
 }
 
 /* --- お題 → プレイ --- */
+let lastGrip = null;
+
 function nextRound(){
   clearStage();
   S.round++;
@@ -623,14 +1055,32 @@ function nextRound(){
   const g = GAMES[(Math.random()*GAMES.length)|0];
   const tier = tierOf(S.level);
   const sub = typeof g.sub === 'function' ? g.sub(tier) : g.sub;
+  const two = !!(g.two && g.two(tier));
   /* そのミニゲームが初めて出たときだけ、遊びかたを長めに見せる */
   const first = !SEEN[g.cmd];
   SEEN[g.cmd] = 1;
-  const v = veil(`<div class="cmd">${g.cmd}<small>${sub}</small></div>
-    ${first ? `<p class="how">${g.how}</p><p class="creed">はじめて出たお題</p>` : ''}`);
-  SFX.cmd(); shake('tap'); flash(false);
   barIn.style.width = '100%'; barEl.classList.remove('hot');
-  after(first ? 2100 : 720, () => { v.remove(); play(g, tier, sub); });
+
+  /* かまえカード（Wiiの「フォーム」）。
+     操作が前のラウンドと変わるときだけ出す。カードが出ること自体が
+     「持ちかたを変えろ」の合図になるので、同じ操作が続くならテンポを優先して省く */
+  const showGrip = g.grip !== lastGrip || first;
+  lastGrip = g.grip;
+  const cmdCard = () => {
+    const v = veil(`<div class="cmd"><span class="gripline">${GRIPS[g.grip].name}</span>${g.cmd}<small>${sub}</small></div>
+      ${first ? `<p class="how">${g.how}</p><p class="creed">はじめて出たお題</p>` : ''}`);
+    SFX.cmd(); shake('tap'); flash(false);
+    after(first ? 2100 : 700, () => { v.remove(); play(g, tier, sub, two); });
+  };
+  if(!showGrip) return cmdCard();
+  const gv = veil(`<div class="grip">
+    ${gripIcon(g.grip, 76)}
+    <div class="gname">${GRIPS[g.grip].name}</div>
+    <div class="ghint">${GRIPS[g.grip].hint}</div>
+    ${two ? '<div class="gtag">ゆびを 2ほん</div>' : ''}
+  </div>`);
+  SFX.tap();
+  after(first ? 950 : 620, () => { gv.remove(); cmdCard(); });
 }
 
 function speedUp(){
@@ -641,7 +1091,7 @@ function speedUp(){
   after(1050, () => { v.remove(); nextRound(); });
 }
 
-function play(g, tier, sub){
+function play(g, tier, sub, two){
   resolved = false; S.playing = true; freezeUntil = 0;
   const rate = Math.pow(1.17, S.level - 1);
   duration = Math.max(1900, 4300 / rate);
@@ -658,8 +1108,13 @@ function play(g, tier, sub){
   /* プレイ中もお題を出しっぱなしにする（何をすればいいか見失わないように） */
   const cap = document.createElement('div');
   cap.className = 'caption';
-  cap.innerHTML = `<b>${g.cmd}</b>${sub ? ' <span>' + sub + '</span>' : ''}`;
+  cap.innerHTML = `<i>${GRIPS[g.grip].name}</i><b>${g.cmd}</b>${sub ? ' <span>' + sub + '</span>' : ''}`;
   stage.appendChild(cap);
+  if(two){
+    const t2 = document.createElement('div');
+    t2.className = 'twohand'; t2.textContent = 'ゆびを 2ほん';
+    stage.appendChild(t2);
+  }
   if(tier > 1){
     const b = document.createElement('div');
     b.className = 'tierbadge'; b.textContent = 'むずかしさ ' + tier;
@@ -717,7 +1172,7 @@ function gameOver(){
   const rank = S.score >= 30 ? '玄関大明神' : S.score >= 20 ? '守護長老'
              : S.score >= 12 ? '中堅信徒' : S.score >= 6 ? '見習い' : '一般人';
   const v = veil(`
-    <div style="font-size:44px">🗑️</div>
+    <div style="line-height:0">${bin(58)}</div>
     <h1 style="font-size:24px">スリッパは<br>捨てられた</h1>
     <div class="big-num">${S.score}</div>
     ${isBest ? '<div class="combo" style="position:static">自己ベスト更新！</div>' : ''}
@@ -744,6 +1199,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 try{ S.best = parseInt(localStorage.getItem('slipperBest')) || 0; }catch(e){}
+muteBtn.innerHTML = soundIcon(AU.on);
+document.getElementById('rotico').innerHTML = slipperPair(GREEN, 34);
 drawHud();
 title();
 
