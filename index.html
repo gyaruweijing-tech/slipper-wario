@@ -150,6 +150,9 @@ button.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #2F614A}
 .howlist b{display:block;font-size:15px;color:var(--green)}
 .sublink{background:none;border:none;font:inherit;font-size:13px;color:var(--sub);
   text-decoration:underline;cursor:pointer;padding:4px}
+/* 差し替え用のキャラ画像。SVGと同じ扱いになるようにしておく */
+img.art{display:block;width:auto;pointer-events:none;-webkit-user-drag:none}
+img.art.logo{width:82%;max-width:310px;height:auto}
 /* ---- かまえカード（Wiiの「フォーム」にあたる、操作の宣言） ---- */
 .grip{display:flex;flex-direction:column;align-items:center;gap:10px;
   animation:pop .22s cubic-bezier(.2,1.7,.4,1)}
@@ -403,8 +406,31 @@ function dust(size){
   const p = 'M30 12L41 18L52 22L46 33L49 45L36 47L28 55L20 45L8 42L13 30L9 18L22 19Z';
   return art(60, 62, size, `<path d="${p}" fill="#9A9285"/>${shade(p, '#6F675C', 38)}<path d="${p}"/>`);
 }
-/* 主人公。フードをかぶった小さな守護者（差し替え前のプレースホルダ） */
+/* キャラ画像。assets/ に置かれていればそれを使い、無ければ下のSVGで代用する。
+   ファイルが無くても絶対に壊れないようにしておく（読めなければ黙ってSVGのまま） */
+const ART = { guardian:null, tidier:null, logo:null };
+const ART_FILE = { guardian:'char-guardian', tidier:'char-tidier', logo:'logo' };
+function loadArt(){
+  Object.keys(ART).forEach(k => {
+    const im = new Image();
+    im.onload = () => {
+      ART[k] = im.src;
+      /* タイトルを開いている最中なら描き直して反映する */
+      if(!S.playing && stage.querySelector('#go')) title();
+    };
+    im.src = 'assets/' + ART_FILE[k] + '.png';
+  });
+}
+/* SVG版と同じ高さになるように「高さ」で合わせる。
+   幅で合わせると画像の縦横比しだいで背丈が変わり、配置が崩れる */
+function imgArt(src, size, flip){
+  return `<img src="${src}" alt="" draggable="false" class="art"
+    style="height:${Math.round(size*74/60)}px${flip ? ';transform:scaleX(-1)' : ''}">`;
+}
+
+/* 主人公。フードをかぶった小さな守護者（assets/char-guardian.png があれば差し替わる） */
 function guardian(size, flip){
+  if(ART.guardian) return imgArt(ART.guardian, size, flip);
   return art(60, 74, size, `
     <path d="M30 8C43 8 49 21 49 34V44H11V34C11 21 17 8 30 8Z" fill="${GREEN}"/>
     ${shade('M30 8C43 8 49 21 49 34V44H11V34C11 21 17 8 30 8Z', '#2C5A43', 36)}
@@ -417,8 +443,10 @@ function guardian(size, flip){
     ${shade('M15 44H45L51 70H9Z', '#2C5A43', 58)}
     <path d="M15 44H45L51 70H9Z"/>`, flip);
 }
-/* かたづけ魔。悪人ではなく、良かれと思ってやっている人。だからずっと笑っている */
+/* かたづけ魔。悪人ではなく、良かれと思ってやっている人。だからずっと笑っている
+   （assets/char-tidier.png があれば差し替わる） */
 function tidier(size, flip){
+  if(ART.tidier) return imgArt(ART.tidier, size, flip);
   return art(60, 74, size, `
     <path d="M19 28C19 20 24 15 30 15C36 15 41 20 41 28V33C41 40 36 44 30 44C24 44 19 40 19 33Z" fill="${CREAM}"/>
     ${shade('M19 28C19 20 24 15 30 15C36 15 41 20 41 28V33C41 40 36 44 30 44C24 44 19 40 19 33Z', '#E8DFCC', 37)}
@@ -705,8 +733,8 @@ GAMES.push({ cmd:'とめろ！', grip:'mash',
   const z1 = document.createElement('div'); z1.className='zone'; z1.style.left='13%'; z1.style.top='50%'; z1.innerHTML = shelf(76);
   const z2 = document.createElement('div'); z2.className='zone'; z2.style.left='87%'; z2.style.top='50%'; z2.innerHTML = bin(76);
   stage.append(z1, z2);
-  el(tidier(78, true), 74, 24).style.cursor = 'default';
-  if(ctx.tier >= 3) el(tidier(78, true), 82, 76).style.cursor = 'default';
+  el(tidier(78, true), 72, 22).style.cursor = 'default';
+  if(ctx.tier >= 3) el(tidier(78, true), 80, 70).style.cursor = 'default';
   const s = el(slipper('#D9534F',54,false), 50, 50);
   s.style.cursor = 'default';
   const g = document.createElement('div'); g.className = 'gauge'; g.innerHTML = '<i></i>';
@@ -1013,8 +1041,9 @@ function title(){
   drawHud(); barIn.style.width = '100%'; barEl.classList.remove('hot');
   const bestLine = S.best ? `<p class="lead" style="margin-top:-6px">最高記録 <strong style="color:var(--gold)">${S.best}</strong></p>` : '';
   const v = veil(`
-    ${slipperPair(GREEN, 42)}
-    <h1>スリッパを<br><em>捨てるな</em></h1>
+    ${ART.logo
+      ? `<img src="${ART.logo}" alt="スリッパを捨てるな" class="art logo">`
+      : slipperPair(GREEN, 42) + '<h1>スリッパを<br><em>捨てるな</em></h1>'}
     <p class="lead">あなたは、よかれと思って<br>よその一足を捨ててしまった。<br>その日から、守る側になった。</p>
     ${bestLine}
     <button class="btn" id="go">はじめる</button>
@@ -1172,7 +1201,7 @@ function gameOver(){
   const rank = S.score >= 30 ? '玄関大明神' : S.score >= 20 ? '守護長老'
              : S.score >= 12 ? '中堅信徒' : S.score >= 6 ? '見習い' : '一般人';
   const v = veil(`
-    <div style="line-height:0">${bin(58)}</div>
+    <div style="display:flex;align-items:flex-end;gap:16px;line-height:0">${guardian(64)}${bin(54)}</div>
     <h1 style="font-size:24px">スリッパは<br>捨てられた</h1>
     <div class="big-num">${S.score}</div>
     ${isBest ? '<div class="combo" style="position:static">自己ベスト更新！</div>' : ''}
@@ -1203,6 +1232,7 @@ muteBtn.innerHTML = soundIcon(AU.on);
 document.getElementById('rotico').innerHTML = slipperPair(GREEN, 34);
 drawHud();
 title();
+loadArt();   /* assets/ にキャラ画像があれば差し替える。無ければ何も起きない */
 
 /* オフラインでも遊べるように Service Worker を登録（file:// で開いたときは何もしない） */
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
