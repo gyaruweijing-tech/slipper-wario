@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>スリッパを捨てるな</title>
+<style>
+:root{
+  --bg:#FBF7EF; --ink:#2B2A26; --sub:#7A7264;
+  --green:#3F7D5E; --gold:#C9A227; --red:#D9534F; --paper:#FFFDF8;
+  --line:#E4DACA;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; user-select:none;
+}
+#app{
+  position:relative; width:min(100vw,430px); height:min(100vh,780px);
+  background:var(--paper); overflow:hidden;
+  box-shadow:0 10px 40px rgba(0,0,0,.12); border-radius:18px;
+  display:flex; flex-direction:column;
+}
+#app.shk{animation:appshake .3s}
+@keyframes appshake{
+  0%,100%{transform:translate(0,0) rotate(0)}
+  20%{transform:translate(-7px,3px) rotate(-.8deg)}
+  40%{transform:translate(6px,-4px) rotate(.8deg)}
+  60%{transform:translate(-4px,-2px) rotate(-.4deg)}
+  80%{transform:translate(3px,3px) rotate(.3deg)}
+}
+#app.tap{animation:tapshake .09s}
+@keyframes tapshake{50%{transform:translate(0,-2px)}}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30}
+#flash.on{animation:fl .2s ease-out}
+#flash.bad{background:var(--red)}
+@keyframes fl{from{opacity:.85}to{opacity:0}}
+/* ---- HUD ---- */
+#hud{
+  flex:0 0 auto; padding:10px 12px; display:flex; align-items:center; gap:8px;
+  border-bottom:1px solid var(--line); background:var(--paper); z-index:5;
+}
+#lives{font-size:18px;letter-spacing:2px}
+#lives .off{opacity:.18}
+#score{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px}
+#score small{color:var(--sub);font-weight:400;margin-right:4px;font-size:11px}
+#mute{border:none;background:none;font-size:17px;cursor:pointer;padding:2px 4px;opacity:.85}
+#bar{height:6px;background:var(--line);position:relative;flex:0 0 auto}
+#bar>i{position:absolute;inset:0 auto 0 0;background:var(--green);width:100%}
+#bar.hot>i{background:var(--red)}
+/* ---- stage ---- */
+#stage{position:relative;flex:1 1 auto;overflow:hidden;background:
+  radial-gradient(circle at 50% 30%, #fff 0%, var(--paper) 70%);}
+.obj{position:absolute;transform:translate(-50%,-50%);cursor:pointer;touch-action:manipulation}
+.obj.big{font-size:40px;line-height:1}
+.obj.pop,.tile.pop{animation:pp .18s forwards}
+@keyframes pp{
+  0%{transform:translate(-50%,-50%) scale(1);opacity:1}
+  45%{transform:translate(-50%,-50%) scale(1.45);opacity:1}
+  100%{transform:translate(-50%,-50%) scale(0);opacity:0}
+}
+/* ---- overlays ---- */
+.veil{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;text-align:center;
+  padding:24px;z-index:10;background:rgba(251,247,239,.94);
+}
+.veil.clear{background:transparent;pointer-events:none}
+.cmd{font-size:44px;font-weight:900;letter-spacing:4px;animation:pop .26s cubic-bezier(.2,1.7,.4,1)}
+.cmd small{display:block;font-size:14px;font-weight:600;letter-spacing:1px;color:var(--sub);margin-top:8px}
+@keyframes pop{0%{transform:scale(.4) rotate(-8deg);opacity:0}60%{transform:scale(1.12) rotate(2deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+.win{color:var(--green)} .lose{color:var(--red)}
+h1{font-size:30px;line-height:1.35;letter-spacing:2px}
+h1 em{font-style:normal;color:var(--green)}
+.lead{color:var(--sub);font-size:14px;line-height:1.9}
+button.btn{
+  font:inherit;font-weight:800;font-size:17px;letter-spacing:2px;
+  padding:14px 34px;border:none;border-radius:999px;
+  background:var(--green);color:#fff;cursor:pointer;
+  box-shadow:0 6px 0 #2F614A; transition:.06s;
+}
+button.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #2F614A}
+.creed{font-size:12px;color:var(--sub);line-height:2;letter-spacing:1px}
+.big-num{font-size:64px;font-weight:900;color:var(--gold);line-height:1}
+.combo{position:absolute;top:12px;left:0;right:0;text-align:center;font-weight:900;
+  font-size:20px;color:var(--gold);z-index:12;pointer-events:none;animation:pop .3s}
+.tile{
+  position:absolute;transform:translate(-50%,-50%);
+  width:62px;height:62px;border-radius:14px;background:var(--paper);
+  border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:900;cursor:pointer;
+}
+.tile.done{background:var(--green);color:#fff;border-color:var(--green)}
+.choice{
+  position:absolute;transform:translate(-50%,-50%);
+  padding:16px 22px;border:3px solid var(--ink);border-radius:16px;
+  background:var(--paper);font-weight:900;font-size:19px;letter-spacing:1px;
+  cursor:pointer;white-space:nowrap;
+  transition:left .34s cubic-bezier(.6,0,.4,1), top .34s cubic-bezier(.6,0,.4,1);
+}
+.gauge{position:absolute;left:8%;right:8%;top:80%;height:14px;border:2px solid var(--ink);border-radius:99px;overflow:hidden;background:var(--paper)}
+.gauge>i{display:block;height:100%;background:var(--green);width:50%}
+.zone{position:absolute;font-size:34px;transform:translate(-50%,-50%)}
+.shake{animation:sh .28s}
+@keyframes sh{0%,100%{transform:translate(-50%,-50%)}25%{transform:translate(-57%,-50%)}75%{transform:translate(-43%,-50%)}}
+.hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:var(--sub);pointer-events:none}
+.hint.top{bottom:auto;top:36%}
+.tierbadge{position:absolute;top:8px;right:10px;font-size:11px;font-weight:800;color:var(--sub);letter-spacing:1px;pointer-events:none}
+.caption{position:absolute;top:7px;left:10px;font-size:12px;color:var(--sub);pointer-events:none;letter-spacing:1px}
+.caption b{color:var(--ink);font-size:14px;font-weight:900}
+.caption span{opacity:.9}
+.how{font-size:14px;line-height:1.9;color:var(--ink);background:#fff;
+  border:2px dashed var(--line);border-radius:14px;padding:12px 16px;max-width:300px}
+.howlist{text-align:left;font-size:13px;line-height:1.7;max-width:320px;
+  max-height:66%;overflow-y:auto;padding-right:4px}
+.howlist li{list-style:none;margin-bottom:12px}
+.howlist b{display:block;font-size:15px;color:var(--green)}
+.sublink{background:none;border:none;font:inherit;font-size:13px;color:var(--sub);
+  text-decoration:underline;cursor:pointer;padding:4px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div id="lives"></div>
+    <div id="score"><small>まもった</small><span>0</span></div>
+    <button id="mute" title="音のオンオフ">🔊</button>
+  </div>
+  <div id="bar"><i></i></div>
+  <div id="stage"></div>
+  <div id="flash"></div>
+</div>
+
+<script>
+/* =========================================================
+   スリッパを捨てるな  —  スリッパ守護カルト 教典アプリ
+   ミニゲーム7種 / クリック・タップのみ / 難易度3段階
+   ========================================================= */
+const app     = document.getElementById('app');
+const stage   = document.getElementById('stage');
+const flashEl = document.getElementById('flash');
+const barEl   = document.getElementById('bar');
+const barIn   = barEl.querySelector('i');
+const livesEl = document.getElementById('lives');
+const scoreEl = document.querySelector('#score span');
+const muteBtn = document.getElementById('mute');
+
+/* =======================================================
+   1. 音（WebAudio・外部ファイルなし）
+   ======================================================= */
+const AU = { ctx:null, on:true, bgmTimer:null, bgmOn:false, step:0 };
+
+function actx(){
+  if(!AU.ctx){
+    try { AU.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e){ return null; }
+  }
+  if(AU.ctx.state === 'suspended') AU.ctx.resume();
+  return AU.ctx;
+}
+function tone(freq, dur, type='square', vol=.16, when=0, slideTo=null){
+  if(!AU.on || document.hidden) return;
+  const c = actx(); if(!c) return;
+  const t = c.currentTime + when;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + .01);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g).connect(c.destination);
+  o.start(t); o.stop(t + dur + .03);
+}
+let noiseBuf = null;
+function noise(dur=.08, vol=.12, when=0){
+  if(!AU.on || document.hidden) return;
+  const c = actx(); if(!c) return;
+  if(!noiseBuf){
+    noiseBuf = c.createBuffer(1, c.sampleRate*.4, c.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  }
+  const t = c.currentTime + when;
+  const s = c.createBufferSource(); s.buffer = noiseBuf;
+  const g = c.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(g).connect(c.destination);
+  s.start(t); s.stop(t + dur);
+}
+const SFX = {
+  cmd:  () => { tone(150,.16,'square',.22); noise(.09,.16); },
+  tap:  () => { tone(900,.05,'square',.10); },
+  pop:  () => { tone(660,.05,'triangle',.13); tone(1320,.07,'triangle',.09,.03); },
+  win:  () => { tone(660,.07,'square',.16); tone(880,.07,'square',.16,.06); tone(1320,.18,'square',.16,.12); },
+  lose: () => { tone(300,.42,'sawtooth',.18,0,90); noise(.2,.10); },
+  level:() => [0,4,7,12].forEach((n,i)=>tone(440*Math.pow(2,n/12),.13,'square',.15,i*.08)),
+  over: () => [0,-2,-5,-9].forEach((n,i)=>tone(392*Math.pow(2,n/12),.35,'triangle',.16,i*.20)),
+  start:() => [0,7,12].forEach((n,i)=>tone(330*Math.pow(2,n/12),.12,'square',.15,i*.07))
+};
+/* BGM: レベルが上がるとテンポも音程も上がる */
+const RIFF = [0,7,12,7, 3,7,10,7];
+function bgmStart(){ bgmStop(); AU.bgmOn = true; AU.step = 0; bgmTick(); }
+function bgmStop(){ AU.bgmOn = false; clearTimeout(AU.bgmTimer); }
+function bgmTick(){
+  if(!AU.bgmOn) return;
+  /* 画面が見えていない間は鳴らさない（裏で鳴り続けるのを防ぐ） */
+  if(document.hidden){ AU.bgmTimer = setTimeout(bgmTick, 400); return; }
+  const rate = Math.pow(1.11, S.level - 1);
+  const iv   = 280 / rate;
+  const base = 110 * Math.pow(2, (S.level - 1) / 24);
+  tone(base * Math.pow(2, RIFF[AU.step % 8] / 12), iv/1000*.85, 'triangle', .075);
+  if(AU.step % 2 === 0) noise(.025, .035);
+  AU.step++;
+  AU.bgmTimer = setTimeout(bgmTick, iv);
+}
+muteBtn.onclick = () => { AU.on = !AU.on; muteBtn.textContent = AU.on ? '🔊' : '🔇'; if(AU.on) SFX.tap(); };
+
+/* =======================================================
+   2. 手触り（ヒットストップ・シェイク・フラッシュ・バイブ）
+   ======================================================= */
+let freezeUntil = 0;
+function buzz(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
+function flash(bad){
+  flashEl.classList.toggle('bad', !!bad);
+  flashEl.classList.remove('on'); void flashEl.offsetWidth; flashEl.classList.add('on');
+}
+function shake(cls){
+  app.classList.remove('shk','tap'); void app.offsetWidth; app.classList.add(cls);
+}
+function hitstop(ms){ freezeUntil = performance.now() + ms; deadline += ms; }
+/* 小さな成功（1個たおした等）の気持ちよさ */
+function poof(d){
+  d.dead = true;
+  d.style.pointerEvents = 'none';
+  d.classList.add('pop');
+  setTimeout(() => d.remove(), 190);
+  SFX.pop(); hitstop(45); shake('tap'); buzz(12);
+}
+
+/* =======================================================
+   3. 描画ヘルパ
+   ======================================================= */
+const SLIPPER_COLORS = ['#D9534F','#3F7D5E','#4A6FA5','#C9A227','#8E5AA8','#D97B3F'];
+const SOLE = 'M30 4C46 4 55 18 55 42c0 26-9 44-25 44S5 68 5 42C5 18 14 4 30 4z';
+let uid = 0;
+function slipper(color, size, flip, pat){
+  const id = 'cp' + (++uid);
+  let deco = '';
+  if(pat === 'dot')    deco = `<g clip-path="url(#${id})" fill="#FFFDF8" opacity=".85"><circle cx="19" cy="55" r="6"/><circle cx="41" cy="55" r="6"/><circle cx="30" cy="72" r="6"/></g>`;
+  if(pat === 'stripe') deco = `<g clip-path="url(#${id})" fill="#FFFDF8" opacity=".85"><rect x="0" y="47" width="60" height="7"/><rect x="0" y="61" width="60" height="7"/><rect x="0" y="75" width="60" height="7"/></g>`;
+  return `<svg width="${size}" height="${size*1.5}" viewBox="0 0 60 90" style="transform:scaleX(${flip?-1:1});display:block">
+    <defs><clipPath id="${id}"><path d="${SOLE}"/></clipPath></defs>
+    <path d="${SOLE}" fill="${color}" stroke="#2B2A26" stroke-width="3"/>
+    ${deco}
+    <path d="M8 34C18 16 42 16 52 34c-10 12-34 12-44 0z" fill="#FFFDF8" stroke="#2B2A26" stroke-width="3"/>
+  </svg>`;
+}
+function el(html, x, y, cls){
+  const d = document.createElement('div');
+  d.className = 'obj ' + (cls || '');
+  d.innerHTML = html;
+  d.style.left = x + '%'; d.style.top = y + '%';
+  stage.appendChild(d);
+  return d;
+}
+function move(d, x, y){ d.style.left = x + '%'; d.style.top = y + '%'; }
+const rnd  = (a,b) => a + Math.random()*(b-a);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+
+/* =======================================================
+   4. ミニゲーム（build(ctx) / ctx.tier は 1〜3）
+   ======================================================= */
+const GAMES = [];
+
+/* 1. まもれ！ — 迫るゴミ袋をたたく。tier1から蛇行 / tier2以降は硬い袋 */
+GAMES.push({ cmd:'まもれ！',
+  how:'スリッパに迫るゴミ袋をタップして壊せ。1つでも届いたら負け。',
+  sub: t => t>=3 ? 'かたいのだらけ' : t>=2 ? 'かたいのが混ざる' : 'ゴミ袋をたたけ',
+  build(ctx){
+  const c = SLIPPER_COLORS[0];
+  el(slipper(c,58,false), 44, 55).style.cursor = 'default';
+  el(slipper(c,58,true),  58, 55).style.cursor = 'default';
+  const n = 3 + Math.min(3, Math.floor(ctx.level/2));
+  let left = n;
+  for(let i=0;i<n;i++){
+    const a = rnd(0, Math.PI*2);
+    const o = { x: 50 + Math.cos(a)*72, y: 55 + Math.sin(a)*72 };
+    let hp = ctx.tier >= 3 ? (i % 3 !== 0 ? 2 : 1)
+           : ctx.tier >= 2 ? (i % 2 === 0 ? 2 : 1) : 1;
+    const d = el(hp > 1 ? '🪨' : '🗑️', o.x, o.y, 'big');
+    if(hp > 1) d.style.fontSize = '46px';
+    const sp = (24 + ctx.tier*4) * ctx.rate;
+    let t = rnd(0,6);
+    d.onpointerdown = e => {
+      e.stopPropagation();
+      if(--hp > 0){ d.textContent = '🗑️'; d.style.fontSize = '40px'; SFX.tap(); shake('tap'); return; }
+      poof(d); if(--left === 0) ctx.win();
+    };
+    ctx.frame(dt => {
+      if(d.dead) return;
+      t += dt;
+      const dx = 50 - o.x, dy = 55 - o.y, L = Math.hypot(dx,dy) || 1;
+      if(L < 9){ d.dead = true; ctx.lose(); return; }
+      const ux = dx/L, uy = dy/L;
+      const w = Math.sin(t*6) * (ctx.tier >= 3 ? 34 : ctx.tier >= 2 ? 26 : 15);
+      o.x += (ux*sp - uy*w) * dt;
+      o.y += (uy*sp + ux*w) * dt;
+      move(d, o.x, o.y);
+    });
+  }
+}});
+
+/* 2. ひろえ！ — 落ちるスリッパを全部キャッチ。tier2からゴミが混ざる */
+GAMES.push({ cmd:'ひろえ！',
+  how:'落ちてくるスリッパを全部タップして拾え。1つでも床に落ちたら負け。ゴミ箱は触るな。',
+  sub: t => t>=2 ? 'ゴミは掴むな' : '床につけるな',
+  build(ctx){
+  const n = 3 + Math.min(2, Math.floor(ctx.level/3));
+  let left = n;
+  for(let i=0;i<n;i++){
+    const c = SLIPPER_COLORS[i % SLIPPER_COLORS.length];
+    const o = { x: rnd(18,82), y: rnd(-32,-6) }, x0 = o.x;
+    const d = el(slipper(c,52,i%2===1), o.x, o.y);
+    const sp = 33 * ctx.rate;
+    let t = rnd(0,6);
+    d.onpointerdown = e => { e.stopPropagation(); poof(d); if(--left === 0) ctx.win(); };
+    ctx.frame(dt => {
+      if(d.dead) return;
+      t += dt; o.y += sp*dt;
+      o.x = x0 + Math.sin(t*3.4) * (ctx.tier >= 3 ? 19 : ctx.tier >= 2 ? 14 : 9);
+      move(d, o.x, o.y);
+      if(o.y > 104){ d.dead = true; ctx.lose(); }
+    });
+  }
+  if(ctx.tier >= 2){
+    for(let i=0;i<(ctx.tier >= 3 ? 3 : 1);i++){
+      const o = { x: rnd(15,85), y: rnd(-45,-10) };
+      const d = el('🗑️', o.x, o.y, 'big');
+      d.onpointerdown = e => { e.stopPropagation(); d.classList.add('shake'); ctx.lose(); };
+      ctx.frame(dt => { if(d.dead) return; o.y += 30*ctx.rate*dt; move(d,o.x,o.y); });
+    }
+  }
+}});
+
+/* 3. さがせ！ — 履物の山からスリッパ。最初から動く */
+GAMES.push({ cmd:'さがせ！',
+  how:'ゴチャゴチャの履物の中からスリッパを1つ見つけてタップ。他を押したら負け。',
+  sub: t => t>=3 ? '速い、多い' : t>=2 ? 'よく動く' : 'スリッパはどれだ',
+  build(ctx){
+  const junk = ['👞','🥾','🧦','👟','👡','🥿','👢'];
+  const n = 12 + ctx.level*2 + (ctx.tier>=3 ? 6 : 0);
+  const target = Math.floor(Math.random()*n);
+  const drift = ctx.tier >= 3 ? 20 : ctx.tier >= 2 ? 13 : 6;
+  for(let i=0;i<n;i++){
+    const o = { x: rnd(12,88), y: rnd(10,86), vx: rnd(-1,1)*drift, vy: rnd(-1,1)*drift };
+    const rot = rnd(-40,40);
+    const hit = i === target;
+    const d = hit
+      ? el(slipper(pick(SLIPPER_COLORS),46,Math.random()<.5), o.x, o.y)
+      : el(pick(junk), o.x, o.y, 'big');
+    d.style.transform = `translate(-50%,-50%) rotate(${rot}deg)`;
+    d.onpointerdown = e => {
+      e.stopPropagation();
+      if(hit) ctx.win(); else { d.classList.add('shake'); ctx.lose(); }
+    };
+    if(drift) ctx.frame(dt => {
+      o.x += o.vx*dt; o.y += o.vy*dt;
+      if(o.x < 8 || o.x > 92) o.vx *= -1;
+      if(o.y < 8 || o.y > 90) o.vy *= -1;
+      move(d, o.x, o.y);
+    });
+  }
+}});
+
+/* 4. そろえろ！ — 見本の片割れ。tier2 で同色の柄ちがい、tier3 は色×柄 6択 */
+GAMES.push({ cmd:'そろえろ！',
+  how:'上の見本とまったく同じスリッパを下から選べ。色だけでなく柄も見ろ。',
+  sub: t => t>=3 ? '色も柄も見ろ' : t>=2 ? '柄を見ろ' : '左右をそろえろ',
+  build(ctx){
+  let opts;   /* {c, p} の配列 */
+  if(ctx.tier >= 3){
+    const cs = shuffle(SLIPPER_COLORS).slice(0,2);
+    opts = [];
+    cs.forEach(c => ['plain','dot','stripe'].forEach(p => opts.push({c,p})));
+  }else if(ctx.tier >= 2){
+    const c = pick(SLIPPER_COLORS);
+    opts = ['plain','dot','stripe'].map(p => ({c,p}));
+  }else{
+    opts = shuffle(SLIPPER_COLORS).slice(0,5).map(c => ({c, p:'plain'}));
+  }
+  const ans = pick(opts);
+  el(slipper(ans.c,64,false,ans.p), 50, 20).style.cursor = 'default';
+  const list = shuffle(opts);
+  const row = list.length > 4 ? 2 : 1;
+  list.forEach((o,i) => {
+    const per = Math.ceil(list.length/row);
+    const r = Math.floor(i/per), k = i % per, len = Math.min(per, list.length - r*per);
+    const x = 50 + (k - (len-1)/2) * (74/per);
+    const y = row === 1 ? 63 : (r === 0 ? 53 : 78);
+    const d = el(slipper(o.c, row === 1 ? 44 : 38, true, o.p), Math.max(11, Math.min(89, x)), y);
+    d.onpointerdown = e => {
+      e.stopPropagation();
+      (o.c === ans.c && o.p === ans.p) ? ctx.win() : (d.classList.add('shake'), ctx.lose());
+    };
+  });
+  const t = document.createElement('div');
+  t.className = 'hint top'; t.textContent = '↑ これの相棒をさがせ';
+  stage.appendChild(t);
+}});
+
+/* 5. とめろ！ — 母がゴミ箱へ。連打で引き戻す。tier2から急加速、tier3は母が2人 */
+GAMES.push({ cmd:'とめろ！',
+  how:'画面をどこでも連打してスリッパを🏠まで引き戻せ。🗑️に着いたら負け。',
+  sub: t => t>=3 ? '母が2人いる' : t>=2 ? '力が強い' : '連打でひきもどせ',
+  build(ctx){
+  const z1 = document.createElement('div'); z1.className='zone'; z1.style.left='10%'; z1.style.top='50%'; z1.textContent='🏠';
+  const z2 = document.createElement('div'); z2.className='zone'; z2.style.left='90%'; z2.style.top='50%'; z2.textContent='🗑️';
+  stage.append(z1, z2);
+  el('👵', 76, 30, 'big').style.cursor = 'default';
+  if(ctx.tier >= 3) el('👵', 84, 68, 'big').style.cursor = 'default';
+  const s = el(slipper('#D9534F',54,false), 50, 50);
+  s.style.cursor = 'default';
+  const g = document.createElement('div'); g.className = 'gauge'; g.innerHTML = '<i></i>';
+  stage.appendChild(g);
+  const gi = g.querySelector('i');
+  const pull = (ctx.tier >= 3 ? 21 : ctx.tier >= 2 ? 17.5 : 14.5) * ctx.rate;
+  let x = 50, done = false, t = 0;
+  stage.onpointerdown = () => {
+    if(done) return;
+    x -= 5.5; SFX.tap(); shake('tap'); buzz(8);
+    s.animate([{transform:'translate(-50%,-50%) scale(1.18)'},{transform:'translate(-50%,-50%) scale(1)'}],140);
+  };
+  ctx.frame(dt => {
+    if(done) return;
+    t += dt;
+    const burst = (ctx.tier >= 2 && Math.sin(t*2.2) > (ctx.tier >= 3 ? .55 : .8)) ? 2.1 : 1;
+    x += pull * burst * dt;
+    move(s, x, 50);
+    gi.style.width = Math.max(0, Math.min(100, 100 - x)) + '%';
+    if(x >= 88){ done = true; ctx.lose(); }
+    if(x <= 14){ done = true; ctx.win(); }
+  });
+}});
+
+/* 6. となえろ！ — 教義を順に。tier2 は逆から / tier3 は逆＋タイルが動く */
+GAMES.push({ cmd:'となえろ！',
+  how:'バラバラの文字を「ス→リ→ッ→パ→を」の順にタップ。1つでも順番を間違えたら負け。',
+  sub: t => t>=3 ? 'ぎゃく＋動く' : t>=2 ? 'ぎゃくから！' : 'ス→リ→ッ→パ→を',
+  build(ctx){
+  const base = ['ス','リ','ッ','パ','を'];
+  const seq = ctx.tier >= 2 ? base.slice().reverse() : base;
+  const spots = shuffle([[25,24],[73,22],[20,50],[78,52],[50,38],[30,76],[70,78]]).slice(0, seq.length);
+  const drift = ctx.tier >= 3 ? 13 : 0;
+  let idx = 0;
+  shuffle(seq).forEach((ch,i) => {
+    const t = document.createElement('div');
+    t.className = 'tile'; t.textContent = ch;
+    t.style.left = spots[i][0] + '%'; t.style.top = spots[i][1] + '%';
+    if(drift){
+      const o = { x:spots[i][0], y:spots[i][1], vx:rnd(-1,1)*drift, vy:rnd(-1,1)*drift };
+      ctx.frame(dt => {
+        o.x += o.vx*dt; o.y += o.vy*dt;
+        if(o.x < 12 || o.x > 88) o.vx *= -1;
+        if(o.y < 12 || o.y > 86) o.vy *= -1;
+        t.style.left = o.x + '%'; t.style.top = o.y + '%';
+      });
+    }
+    t.onpointerdown = e => {
+      e.stopPropagation();
+      if(ch === seq[idx]){
+        t.classList.add('done'); t.style.pointerEvents = 'none';
+        SFX.tap(); hitstop(35);
+        if(++idx === seq.length) ctx.win();
+      }else{ t.classList.add('shake'); ctx.lose(); }
+    };
+    stage.appendChild(t);
+  });
+}});
+
+/* 7. えらべ！ — 教義にしたがえ。tier2 で位置が入れ替わる / tier3 は4択＋2回入れ替え */
+GAMES.push({ cmd:'えらべ！',
+  how:'教義にしたがって選べ。スリッパは、捨てない。（位置が入れ替わることがある）',
+  sub: t => t>=3 ? '2回入れ替わる' : t>=2 ? '入れ替わるぞ' : '教義にしたがえ',
+  build(ctx){
+  const labels = ctx.tier >= 3
+    ? ['すてる','すてない','ちょっとすてる','あとで すてる']
+    : ['すてる','すてない','ちょっとすてる'];
+  const ys = labels.length === 4 ? [22,42,62,82] : [28,50,72];
+  const shown = shuffle(labels);
+  const nodes = shown.map((txt,i) => {
+    const d = document.createElement('div');
+    d.className = 'choice';
+    d.textContent = txt;
+    d.style.left = '50%'; d.style.top = ys[i] + '%';
+    d.dataset.ok = (txt === 'すてない') ? '1' : '';
+    d.onpointerdown = e => {
+      e.stopPropagation();
+      if(d.dataset.ok === '1') ctx.win();
+      else { d.classList.add('shake'); ctx.lose(); }
+    };
+    stage.appendChild(d);
+    return d;
+  });
+  if(ctx.tier >= 2){
+    const swap = () => { const s = shuffle(ys); nodes.forEach((d,i) => d.style.top = s[i] + '%'); SFX.tap(); };
+    ctx.after(520, swap);
+    if(ctx.tier >= 3) ctx.after(1180, swap);
+  }
+}});
+
+/* =======================================================
+   5. ゲーム進行
+   ======================================================= */
+const S = { lives:3, score:0, round:0, level:1, combo:0, best:0, playing:false };
+const SEEN = {};   /* そのミニゲームを一度でも見たか（初回だけ説明を出す） */
+let frames = [], timeouts = [], rafId = null, last = 0, resolved = false, deadline = 0, duration = 0;
+
+const tierOf = lv => Math.min(3, Math.ceil(lv/2));
+
+function clearStage(){
+  frames = [];
+  timeouts.forEach(clearTimeout); timeouts = [];
+  if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+  stage.onpointerdown = null;
+  stage.innerHTML = '';
+  freezeUntil = 0;
+}
+function after(ms, fn){ timeouts.push(setTimeout(fn, ms)); }
+
+function drawHud(){
+  livesEl.innerHTML = [0,1,2].map(i => `<span class="${i < S.lives ? '' : 'off'}">🩴</span>`).join('');
+  scoreEl.textContent = S.score;
+}
+function veil(html, cls){
+  const v = document.createElement('div');
+  v.className = 'veil ' + (cls || '');
+  v.innerHTML = html;
+  stage.appendChild(v);
+  return v;
+}
+
+/* --- タイトル --- */
+function title(){
+  bgmStop(); clearStage();
+  S.lives = 3; S.score = 0; S.round = 0; S.level = 1; S.combo = 0;
+  drawHud(); barIn.style.width = '100%'; barEl.classList.remove('hot');
+  const bestLine = S.best ? `<p class="lead" style="margin-top:-6px">最高記録 <strong style="color:var(--gold)">${S.best}</strong></p>` : '';
+  const v = veil(`
+    <div style="font-size:56px">🩴</div>
+    <h1>スリッパを<br><em>捨てるな</em></h1>
+    <p class="lead">あなたは玄関を守る守護者である。<br>迫りくる廃棄の意志を、5秒でしりぞけよ。</p>
+    ${bestLine}
+    <button class="btn" id="go">はじめる</button>
+    <button class="sublink" id="howto">あそびかたを見る</button>
+    <p class="creed">— 教義 —<br>一、スリッパは家族である<br>二、片方だけでも家族である<br>三、洗えばまだいける</p>`);
+  v.querySelector('#go').onclick = () => { actx(); SFX.start(); bgmStart(); nextRound(); };
+  v.querySelector('#howto').onclick = () => howto();
+}
+
+/* --- あそびかた一覧 --- */
+function howto(){
+  const items = GAMES.map(g => `<li><b>${g.cmd}</b>${g.how}</li>`).join('');
+  const v = veil(`
+    <h1 style="font-size:22px">あそびかた</h1>
+    <p class="lead" style="margin-top:-6px">全部タップだけ。制限時間は約4秒。<br>ライフ🩴3つ、4ラウンドごとに速くなる。</p>
+    <ul class="howlist">${items}</ul>
+    <button class="btn" id="back">もどる</button>`);
+  v.querySelector('#back').onclick = () => { v.remove(); };
+}
+
+/* --- お題 → プレイ --- */
+function nextRound(){
+  clearStage();
+  S.round++;
+  if(S.round > 1 && (S.round - 1) % 4 === 0){ S.level++; return speedUp(); }
+  const g = GAMES[(Math.random()*GAMES.length)|0];
+  const tier = tierOf(S.level);
+  const sub = typeof g.sub === 'function' ? g.sub(tier) : g.sub;
+  /* そのミニゲームが初めて出たときだけ、遊びかたを長めに見せる */
+  const first = !SEEN[g.cmd];
+  SEEN[g.cmd] = 1;
+  const v = veil(`<div class="cmd">${g.cmd}<small>${sub}</small></div>
+    ${first ? `<p class="how">${g.how}</p><p class="creed">はじめて出たお題</p>` : ''}`);
+  SFX.cmd(); shake('tap'); flash(false);
+  barIn.style.width = '100%'; barEl.classList.remove('hot');
+  after(first ? 2100 : 720, () => { v.remove(); play(g, tier, sub); });
+}
+
+function speedUp(){
+  SFX.level(); flash(false);
+  const v = veil(`<div class="big-num">LV.${S.level}</div>
+    <div class="cmd" style="font-size:26px">はやくなる！</div>
+    <div class="tierbadge">むずかしさ ${tierOf(S.level)} / 3</div>`);
+  after(1050, () => { v.remove(); nextRound(); });
+}
+
+function play(g, tier, sub){
+  resolved = false; S.playing = true; freezeUntil = 0;
+  const rate = Math.pow(1.17, S.level - 1);
+  duration = Math.max(1900, 4300 / rate);
+  deadline = performance.now() + duration;
+
+  const ctx = {
+    level: S.level, tier, rate,
+    frame: fn => frames.push(fn),
+    after,
+    win:  () => finish(true),
+    lose: () => finish(false)
+  };
+  g.build(ctx);
+  /* プレイ中もお題を出しっぱなしにする（何をすればいいか見失わないように） */
+  const cap = document.createElement('div');
+  cap.className = 'caption';
+  cap.innerHTML = `<b>${g.cmd}</b>${sub ? ' <span>' + sub + '</span>' : ''}`;
+  stage.appendChild(cap);
+  if(tier > 1){
+    const b = document.createElement('div');
+    b.className = 'tierbadge'; b.textContent = 'むずかしさ ' + tier;
+    stage.appendChild(b);
+  }
+
+  last = performance.now();
+  const loop = now => {
+    rafId = requestAnimationFrame(loop);
+    if(now < freezeUntil){ last = now; return; }
+    const dt = Math.min(.05, (now - last)/1000); last = now;
+    if(resolved) return;
+    const rem = Math.max(0, deadline - now);
+    barIn.style.width = (rem/duration*100) + '%';
+    barEl.classList.toggle('hot', rem < duration*.3);
+    frames.slice().forEach(f => f(dt));
+    if(rem <= 0 && !resolved) finish(false);
+  };
+  rafId = requestAnimationFrame(loop);
+}
+
+function finish(ok){
+  if(resolved) return;
+  resolved = true; S.playing = false; freezeUntil = 0;
+  stage.onpointerdown = null;
+  stage.querySelectorAll('.obj,.tile,.choice').forEach(o => o.style.pointerEvents = 'none');
+
+  if(ok){
+    S.score++; S.combo++;
+    SFX.win(); flash(false); buzz(25);
+  }else{
+    S.lives--; S.combo = 0;
+    SFX.lose(); flash(true); shake('shk'); buzz([35,45,70]);
+  }
+  drawHud();
+
+  const msg = ok
+    ? pick(['まもった！','いける！','まだ使える！','家族を守った'])
+    : pick(['捨てられた…','あぁ…','片方だけになった…','燃えるゴミへ…']);
+  veil(`<div class="cmd ${ok?'win':'lose'}" style="font-size:32px">${msg}</div>`, 'clear');
+  if(ok && S.combo >= 3){
+    const c = document.createElement('div');
+    c.className = 'combo'; c.textContent = `${S.combo}れんぞく まもった！`;
+    stage.appendChild(c);
+  }
+  after(880, () => { S.lives <= 0 ? gameOver() : nextRound(); });
+}
+
+function gameOver(){
+  bgmStop(); clearStage();
+  SFX.over();
+  barIn.style.width = '0%';
+  if(S.score > S.best){ S.best = S.score; try{ localStorage.setItem('slipperBest', S.best); }catch(e){} }
+  const rank = S.score >= 30 ? '玄関大明神' : S.score >= 20 ? '守護長老'
+             : S.score >= 12 ? '中堅信徒' : S.score >= 6 ? '見習い' : '一般人';
+  const v = veil(`
+    <div style="font-size:44px">🗑️</div>
+    <h1 style="font-size:24px">スリッパは<br>捨てられた</h1>
+    <div class="big-num">${S.score}</div>
+    <p class="lead">まもったスリッパ　（最高 ${S.best}）<br>
+      <strong style="color:var(--green);font-size:18px">称号：${rank}</strong></p>
+    <button class="btn" id="again">もういちど守る</button>`);
+  v.querySelector('#again').onclick = () => title();
+}
+
+/* タブを離れている間は時間を止める（戻った瞬間に即死しないように） */
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){
+    hiddenAt = performance.now();
+    clearTimeout(AU.bgmTimer);
+  }else{
+    if(hiddenAt){
+      deadline += performance.now() - hiddenAt;
+      last = performance.now();
+      hiddenAt = 0;
+    }
+    if(AU.bgmOn){ clearTimeout(AU.bgmTimer); bgmTick(); }
+  }
+});
+
+try{ S.best = parseInt(localStorage.getItem('slipperBest')) || 0; }catch(e){}
+drawHud();
+title();
+</script>
+</body>
+</html>
